@@ -1,0 +1,5 @@
+import React, { useState, useEffect } from 'react';
+
+// --- Gemini API 設定 ---
+const apiKey = ""; // 実行環境から自動的に注入されます
+const GEMINI_MODEL = "gemini-2.5-flash-preview-09-2025";
