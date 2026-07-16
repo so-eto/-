@@ -1,0 +1,55 @@
+// 手動調整機能
+  const handleToggleType = (id) => {
+    setResults(prev => prev.map(item => {
+      if (item.id === id) {
+        const nextType = item.type === 'mae' ? 'ato' : item.type === 'ato' ? 'none' : 'mae';
+        
+        let cleanCore = item.formal
+          .replace(/^(株式会社|有限会社|合同会社|（株）|\(株\)|㈱|㈲|（有）|\(有\)|（同）|\(同\)|合同会社|一般社団法人|一般財団法人)/, '')
+          .replace(/(株式会社|有限会社|合同会社|（株）|\(株\)|㈱|㈲|（有）|\(有\)|（同）|\(同\)|合同会社|一般社団法人|一般財団法人)$/, '')
+          .trim();
+
+        let nextFormal = item.formal;
+        if (nextType === 'mae') {
+          nextFormal = `株式会社${cleanCore}`;
+        } else if (nextType === 'ato') {
+          nextFormal = `${cleanCore}株式会社`;
+        } else {
+          nextFormal = cleanCore;
+        }
+
+        return {
+          ...item,
+          type: nextType,
+          formal: nextFormal,
+          reason: '手動調整済み'
+        };
+      }
+      return item;
+    }));
+  };
+
+  // コピー用
+  const copyToClipboard = (text) => {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand('copy');
+      setCopied(true);
+    } catch (err) {
+      console.error('コピー失敗', err);
+    }
+    document.body.removeChild(textarea);
+  };
+
+  const handleBulkCopy = () => {
+    if (results.length === 0) return;
+    const allFormals = results.map(item => item.formal).join('\n');
+    copyToClipboard(allFormals);
+  };
+
+  const getCorporateSearchUrl = (query) => `https://www.houjin-bangou.nta.go.jp/kensaku-kekka.html?kaniKensakuForm_keyWord=${encodeURIComponent(query)}`;
