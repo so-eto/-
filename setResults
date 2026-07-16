@@ -1,0 +1,57 @@
+// 最初にローカル結果（確定＋ローディング中）を即時表示（これで体感速度0秒！）
+    setResults(initialResults);
+
+    // 全てがローカルキャッシュにヒットした場合は、APIを叩かずに即終了
+    if (pendingLines.length === 0) {
+      setIsProcessing(false);
+      return;
+    }
+
+    // 2. キャッシュにない企業のみをGemini APIに送信
+    const apiTargetLines = pendingLines.map(p => p.line);
+    const userQuery = `以下の日本の企業名について、日本の国税庁や商業登記に登録されている正確な正式名称（前株・後株などを含む）、そのタイプ（mae/ato/none）、および「極めて簡潔な15文字以内の解説」を回答してください。
+解説は「〇〇の大手」「〇〇運営」など要点のみに縮小してください。不要な出力は生成時間を遅らせるため不要です。
+
+対象企業リスト:
+${apiTargetLines.join('\n')}`;
+
+    // 応答の構造化JSONスキーマ
+    const responseSchema = {
+      type: "OBJECT",
+      properties: {
+        results: {
+          type: "ARRAY",
+          description: "判別結果リスト",
+          items: {
+            type: "OBJECT",
+            properties: {
+              original: { type: "STRING", description: "入力された元の企業名" },
+              formal: { type: "STRING", description: "登記上の正式名称" },
+              type: { 
+                type: "STRING", 
+                enum: ["mae", "ato", "none"], 
+                description: "前株なら 'mae'、後株なら 'ato'、その他は 'none'" 
+              },
+              reason: { type: "STRING", description: "15文字以内の超簡潔な概要（日本語）" }
+            },
+            required: ["original", "formal", "type", "reason"]
+          }
+        }
+      },
+      required: ["results"]
+    };
+
+    const payload = {
+      contents: [{ parts: [{ text: userQuery }] }],
+      systemInstruction: {
+        parts: [{
+          text: "あなたは日本の商習慣、商業登記情報に精通した超高精度ビジネス解析アシスタントです。入力された企業名から、正確な正式名称を特定してください。レスポンス速度を極限まで高めるため、解説(reason)は15文字以下の端的な表現のみを出力してください。"
+        }]
+      },
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: responseSchema
+      }
+    };
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
