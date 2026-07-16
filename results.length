@@ -1,0 +1,138 @@
+{results.length > 0 ? (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col flex-grow max-h-[600px] overflow-hidden">
+              
+              {/* アクションバー */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-4 mb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                    <span className="bg-indigo-50 text-indigo-700 text-xs px-2.5 py-0.5 rounded font-bold">
+                      スピード判定 {results.length} 件
+                    </span>
+                    AI判定レポート
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    「前株/後株」ボタンで表記をいつでも調整・微補正できます。
+                  </p>
+                </div>
+                
+                {/* 全件一括コピーボタン */}
+                <button
+                  onClick={handleBulkCopy}
+                  className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 cursor-pointer"
+                >
+                  {copied ? <IconCheck /> : <IconCopy />}
+                  {copied ? '一括コピー完了！' : 'すべての正式名称をコピー'}
+                </button>
+              </div>
+
+              {/* 結果リストスクロールエリア */}
+              <div className="flex-grow overflow-y-auto space-y-3 pr-1">
+                {results.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`p-3.5 border rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3 transition-all animate-fade-in ${
+                      item.status === 'processing' 
+                        ? 'bg-slate-50/50 border-slate-150 border-dashed animate-pulse' 
+                        : 'bg-slate-50 hover:bg-indigo-50/10 border-slate-200'
+                    }`}
+                  >
+                    {/* 左：情報表示 */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                        {/* 入力された略称 */}
+                        <span className="text-xs font-bold text-slate-500 bg-slate-200/60 px-2 py-0.5 rounded">
+                          入力: {item.original}
+                        </span>
+                        
+                        {/* 判定元バッヂ */}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                          item.status === 'processing'
+                            ? 'bg-amber-50 text-amber-600 border-amber-200 animate-pulse'
+                            : item.source === 'local'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                        }`}>
+                          {item.status === 'processing' 
+                            ? '⏳ AI検証中...' 
+                            : item.source === 'local' 
+                            ? '⚡️ 秒速キャッシュ判定' 
+                            : '🤖 Gemini AIリアル判定'
+                          }
+                        </span>
+                      </div>
+
+                      {/* 推測された正式名称 */}
+                      <div className="flex items-center gap-2">
+                        {item.status === 'processing' ? (
+                          <span className="flex items-center gap-2 text-slate-400 text-sm italic">
+                            <span className="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></span>
+                            正式登記情報を照合中...
+                          </span>
+                        ) : (
+                          <>
+                            <code className="text-sm font-bold text-slate-900 select-all bg-white border border-slate-200/80 px-2.5 py-1 rounded-lg shadow-sm">
+                              {item.formal}
+                            </code>
+                            <button
+                              onClick={() => {
+                                copyToClipboard(item.formal);
+                              }}
+                              className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-md transition-colors"
+                              title="この名称だけをコピー"
+                            >
+                              <IconCopy />
+                            </button>
+                          </>
+                        )}
+                      </div>
+
+                      {/* 判定根拠 */}
+                      <p className="text-[11px] text-slate-400 mt-1.5 leading-normal flex items-start gap-1">
+                        <span className="mt-0.5">💡</span> 
+                        <span>{item.reason}</span>
+                      </p>
+                    </div>
+
+                    {/* 右：操作ボタン（手動補正 ＆ 外部照合） */}
+                    <div className="flex items-center gap-1.5 self-end md:self-center">
+                      
+                      {/* ワンクリック切り替え */}
+                      <button
+                        onClick={() => handleToggleType(item.id)}
+                        disabled={item.status === 'processing'}
+                        className={`text-[11px] font-bold py-1.5 px-3 rounded-lg border transition-all ${
+                          item.status === 'processing'
+                            ? 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed'
+                            : item.type === 'mae'
+                            ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
+                            : item.type === 'ato'
+                            ? 'bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100'
+                            : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'
+                        }`}
+                        title="前株・後株の配置を変更"
+                      >
+                        {item.type === 'mae' ? '前株' : item.type === 'ato' ? '後株' : 'なし/その他'} ⇄
+                      </button>
+
+                      {/* 外部公式検索 */}
+                      <a
+                        href={getCorporateSearchUrl(item.original)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1.5 text-slate-400 hover:text-indigo-600 border border-slate-200 hover:border-indigo-200 rounded-lg transition-colors bg-white shadow-sm"
+                        title="国税庁法人番号公表サイトで直接確認"
+                      >
+                        <IconExternalLink />
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* クイック通知バー */}
+              {copied && (
+                <div className="mt-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs px-3 py-2.5 rounded-lg flex items-center gap-1.5 shadow-sm animate-fade-in-down">
+                  <IconCheck />
+                  クリップボードに正式名称リストをコピーしました！Excel等にそのまま貼り付けられます。
+                </div>
+              )}
