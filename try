@@ -1,0 +1,66 @@
+try {
+      const data = await fetchWithRetry(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!responseText) {
+        throw new Error("Gemini APIからの応答が空でした。");
+      }
+
+      const parsedData = JSON.parse(responseText);
+      if (!parsedData.results || !Array.isArray(parsedData.results)) {
+        throw new Error("フォーマットエラー");
+      }
+
+      // APIの結果を既存の結果リストにマージして更新
+      setResults(prevResults => {
+        const updated = [...prevResults];
+        parsedData.results.forEach((apiItem) => {
+          // 元の名前でマッピング先を探す
+          const matchIndex = updated.findIndex(item => 
+            item.status === 'processing' && 
+            (item.original.toLowerCase().includes(apiItem.original.toLowerCase()) || apiItem.original.toLowerCase().includes(item.original.toLowerCase()))
+          );
+
+          if (matchIndex !== -1) {
+            updated[matchIndex] = {
+              ...updated[matchIndex],
+              formal: apiItem.formal,
+              type: apiItem.type,
+              reason: apiItem.reason,
+              status: 'complete' // ローディングを完了に変更
+            };
+          }
+        });
+
+        // 万が一、残ってしまった処理中のアイテムを完了状態にフォールバック
+        return updated.map(item => {
+          if (item.status === 'processing') {
+            return {
+              ...item,
+              formal: item.original + ' (株式会社)',
+              reason: '自動補完されました。',
+              status: 'complete'
+            };
+          }
+          return item;
+        });
+      });
+
+    } catch (error) {
+      console.error("API Error: ", error);
+      setApiError("一部のAI判定中にエラーが発生しました。一覧から手動で補正、または再試行してください。");
+      
+      // 失敗した場合は未判定のものも強制終了してユーザーの手動入力を受け付ける
+      setResults(prev => prev.map(item => 
+        item.status === 'processing' 
+          ? { ...item, formal: `${item.original}株式会社`, reason: 'エラーのため仮判定（後株）', status: 'complete' } 
+          : item
+      ));
+    } finally {
+      setIsProcessing(false);
+    }
+  };
